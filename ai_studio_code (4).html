@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مجلس الألعاب | الدخيل أونلاين</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* تصميم Skeuomorphism الكلاسيكي الفخم */
+    :root {
+      --bg: #2a2521;
+      --panel: #d6cbbe;
+      --panel-dark: #b8a793;
+      --wood-dark: #1b120c;
+      --btn-grad: linear-gradient(180deg, #ff9d3b 0%, #d86800 100%);
+      --btn-blue: linear-gradient(180deg, #3aa0ff 0%, #0056b3 100%);
+      --btn-red: linear-gradient(180deg, #ff4d4d 0%, #aa0000 100%);
+      --emboss-shadow: inset 0 2px 1px rgba(255,255,255,0.7), 0 5px 12px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; font-family: 'Tajawal', sans-serif; }
+
+    body {
+      background: radial-gradient(circle, #3d342d, #1a1512);
+      margin: 0;
+      padding: 15px;
+      color: #2b1f14;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .device-container {
+      width: 100%;
+      max-width: 500px;
+      background: #c8baa7;
+      border: 8px solid #553c2a;
+      border-radius: 28px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 3px 6px rgba(255,255,255,0.5);
+      padding: 20px;
+      position: relative;
+    }
+
+    /* شريط الترويسة */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #8b6548;
+      border-radius: 14px;
+      padding: 8px 15px;
+      color: #fff;
+      text-shadow: 0 1px 2px #000;
+      box-shadow: inset 0 2px 3px rgba(0,0,0,0.6), 0 2px 4px rgba(255,255,255,0.4);
+      margin-bottom: 15px;
+    }
+
+    .badge-owner {
+      background: linear-gradient(180deg, #ffd700, #b8860b);
+      color: #000;
+      font-weight: 900;
+      padding: 3px 10px;
+      border-radius: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      border: 1px solid #fff;
+      font-size: 0.85rem;
+    }
+
+    /* تصميم أزرار السكيومورفيزم */
+    .btn {
+      background: var(--btn-grad);
+      border: 2px solid #6b3400;
+      border-radius: 12px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.1rem;
+      padding: 12px 20px;
+      cursor: pointer;
+      box-shadow: var(--emboss-shadow);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      transition: all 0.1s ease;
+      display: inline-block;
+      width: 100%;
+      margin: 8px 0;
+    }
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+    }
+    .btn-blue { background: var(--btn-blue); border-color: #003366; }
+    .btn-red { background: var(--btn-red); border-color: #660000; }
+
+    /* حقول الإدخال المحفورة */
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 10px;
+      border: 2px solid #8e7c68;
+      background: #ebe4db;
+      font-size: 1.05rem;
+      font-weight: bold;
+      box-shadow: inset 0 3px 6px rgba(0,0,0,0.3);
+      color: #2b1f14;
+    }
+    input:focus { outline: none; border-color: #d86800; }
+
+    /* البطاقات */
+    .card {
+      background: #ded5c7;
+      border: 2px solid #a89883;
+      border-radius: 16px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.7);
+    }
+
+    .locked-card {
+      opacity: 0.65;
+      background: #b5a999;
+      position: relative;
+    }
+
+    .tag-soon {
+      background: #736353;
+      color: #f1ebd8;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      float: left;
+    }
+
+    .screen { display: none; }
+    .active { display: block; }
+
+    .role-box {
+      font-size: 1.8rem;
+      font-weight: 900;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      margin: 15px 0;
+      box-shadow: inset 0 3px 8px rgba(0,0,0,0.4);
+    }
+    .role-citizen { background: #96d88c; color: #154e0c; border: 3px solid #4a8640; }
+    .role-imposter { background: #ff8585; color: #6e0000; border: 3px solid #aa1111; }
+  </style>
+</head>
+<body>
+
+<div class="device-container">
+  
+  <!-- الشريط العلوي -->
+  <div class="top-bar">
+    <div id="user-tag-area">
+      <span id="display-name">زائر</span>
+      <span id="owner-badge" class="badge-owner" style="display: none;">الريس والعم 😎</span>
+    </div>
+    <button class="btn btn-blue" style="width: auto; padding: 4px 10px; font-size: 0.85rem;" onclick="openSettings()">⚙️ <span id="txt-settings">الإعدادات</span></button>
+  </div>
+
+  <!-- 1. شاشة تسجيل الدخول -->
+  <div id="screen-auth" class="screen active card">
+    <h2 id="auth-title">تسجيل الدخول السريع 🎮</h2>
+    <p id="auth-desc">حط إيميلك وبيرسلك رمز سري تكمل به اللعب:</p>
+    <div id="step-email">
+      <input type="email" id="input-email" placeholder="اكتب إيميلك هنا...">
+      <button class="btn" onclick="sendOTP()">أرسل الرمز السري 📲</button>
+    </div>
+
+    <div id="step-otp" style="display:none;">
+      <input type="text" id="input-otp" placeholder="حط رمز التحقق (4 أرقام)">
+      <button class="btn" onclick="verifyOTP()">ادخل للمجلس 🚪</button>
+    </div>
+  </div>
+
+  <!-- 2. شاشة الاسم لأول مرة -->
+  <div id="screen-name" class="screen card">
+    <h2>يا هلا والله! وش نسميك؟ 🏷️</h2>
+    <p>اختر اسمك بحكمة، ترى ما يمديك تعدله إلا بعد ساعة!</p>
+    <input type="text" id="input-initial-name" placeholder="لقبك في اللعب...">
+    <button class="btn" onclick="saveInitialName()">تثبيت الاسم والإنطلاق 🔥</button>
+  </div>
+
+  <!-- 3. الردهة الرئيسية واختيار الألعاب -->
+  <div id="screen-lobby" class="screen">
+    <!-- لعبة الدخيل -->
+    <div class="card" style="border: 3px solid #ff9d3b;">
+      <h2>🕵️‍♂️ لعبة الدخيل (أونلاين)</h2>
+      <p>اكتشفوا الجاسوس اللي بينكم قبل ما ينكب العفش!</p>
+      <button class="btn" onclick="openDakeelLobby()">العب الآن مع أخوياك 🚀</button>
+    </div>
+
+    <!-- ألعاب قيد التطوير -->
+    <div class="card locked-card">
+      <span class="tag-soon" id="soon-1">قيد التطوير ⏳</span>
+      <h3>🃏 بلوت الشيوخ</h3>
+      <p>جالسين نظبط التوزيعة والمشاريع لا تستعجلون!</p>
+    </div>
+
+    <div class="card locked-card">
+      <span class="tag-soon" id="soon-2">قيد التطوير ⏳</span>
+      <h3>🥏 كيرم الطيبين</h3>
+      <p>تحت التلميع والبودرة بتجيكم قريباً بإذن الله.</p>
+    </div>
+  </div>
+
+  <!-- 4. غرفة تجهيز لعبة الدخيل -->
+  <div id="screen-dakeel" class="screen card">
+    <button class="btn btn-red" style="width: auto; padding: 4px 10px;" onclick="switchScreen('screen-lobby')">⬅️ رجوع</button>
+    <h2>غرفة الدخيل أونلاين 🕵️‍♂️</h2>
+    
+    <div style="margin: 15px 0;">
+      <button class="btn" onclick="createRoom()">سولك غرفة جديدة 🏠</button>
+    </div>
+
+    <div style="border-top: 2px dashed #998a77; padding-top: 15px;">
+      <p>أو ادخل بكود خويك:</p>
+      <input type="text" id="input-room-code" placeholder="حط كود الغرفة (مثلاً: A1B2)">
+      <button class="btn btn-blue" onclick="joinRoom()">دخول الغرفة 🏃‍♂️</button>
+    </div>
+
+    <!-- تفاصيل الغرفة الحالية -->
+    <div id="room-details" style="display:none; margin-top:20px; background:#e7ded1; padding:15px; border-radius:12px;">
+      <h3>كود الغرفة: <span id="current-room-code" style="color:#d86800; font-size:1.6rem; letter-spacing:2px;"></span></h3>
+      <p style="font-size:0.9rem; color:#6b5a4b;">عط خويك الكود هذا يدخل به من جواله 📲</p>
+      
+      <h4>المتكين في الغرفة حالياً:</h4>
+      <ul id="players-list" style="list-style: none; padding: 0; font-weight: bold;"></ul>
+
+      <div style="margin-top: 15px;">
+        <button id="btn-start-game" class="btn" onclick="startGame()">ابدأ اللعب (لازم 3 أو أكثر) 🏁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. شاشة اللعب النشطة -->
+  <div id="screen-gameplay" class="screen card">
+    <h2 id="game-title">الجولة بدت! ركز 👀</h2>
+    <div id="role-container"></div>
+    <div id="hint-container" style="font-weight: bold; margin-bottom: 15px;"></div>
+
+    <p style="font-size: 0.9rem;">تناقشوا وكل واحد يسأل الثاني بذكاء بدون ما تفضح كلمتك!</p>
+    <button class="btn btn-red" onclick="revealImposter()">كشف الدخيل وإنهاء الجولة 📢</button>
+  </div>
+
+  <!-- 6. شاشة الإعدادات -->
+  <div id="screen-settings" class="screen card">
+    <button class="btn btn-red" style="width: auto; padding: 4px 10px;" onclick="closeSettings()">⬅️ حفظ ورجوع</button>
+    <h2>⚙️ إعدادات الحساب</h2>
+    
+    <div>
+      <label><b>تغيير اسمك:</b></label>
+      <input type="text" id="input-new-name" placeholder="اكتب اسمك الجديد">
+      <p id="cooldown-timer" style="color: #a00; font-size: 0.85rem;"></p>
+      <button class="btn btn-blue" onclick="changeName()">حفظ الاسم الجديد 💾</button>
+    </div>
+
+    <hr style="margin: 20px 0; border: none; border-top: 2px solid #b3a492;">
+
+    <div>
+      <label><b>لغة التطبيق / Language:</b></label>
+      <button class="btn" style="background: linear-gradient(180deg, #707070, #383838); border-color:#222;" onclick="toggleLanguage()">تغيير إلى English 🌐</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const socket = io();
+
+  // بيانات المستخدم الحالية
+  let currentUser = {
+    email: localStorage.getItem('user_email') || null,
+    username: localStorage.getItem('user_name') || null,
+    isOwner: localStorage.getItem('is_owner') === 'true',
+    lastChange: localStorage.getItem('last_name_change') || 0
+  };
+
+  let currentRoom = null;
+  let currentLang = 'ar';
+
+  // التحقق من الجلسة أول ما يفتح
+  window.onload = () => {
+    if (currentUser.email && currentUser.username) {
+      updateUIHeader();
+      switchScreen('screen-lobby');
+    }
+  };
+
+  function updateUIHeader() {
+    document.getElementById('display-name').innerText = currentUser.username || 'زائر';
+    if (currentUser.isOwner) {
+      document.getElementById('owner-badge').style.display = 'inline-block';
+    }
+  }
+
+  function switchScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+  }
+
+  // 1. طلب رمز الدخول
+  async function sendOTP() {
+    const email = document.getElementById('input-email').value;
+    if (!email) return alert('تكفى حط إيميلك أول!');
+
+    const res = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    alert(data.message + (data.debugCode ? ` (رمزك للتجربة: ${data.debugCode})` : ''));
+    document.getElementById('step-email').style.display = 'none';
+    document.getElementById('step-otp').style.display = 'block';
+  }
+
+  // 2. التحقق من الرمز
+  async function verifyOTP() {
+    const email = document.getElementById('input-email').value;
+    const code = document.getElementById('input-otp').value;
+
+    const res = await fetch('/api/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code })
+    });
+    const data = await res.json();
+
+    if (!res.ok) return alert(data.error);
+
+    currentUser.email = data.email;
+    currentUser.isOwner = data.isOwner;
+    localStorage.setItem('user_email', data.email);
+    localStorage.setItem('is_owner', data.isOwner);
+
+    if (!currentUser.username) {
+      switchScreen('screen-name');
+    } else {
+      updateUIHeader();
+      switchScreen('screen-lobby');
+    }
+  }
+
+  // 3. حفظ الاسم لأول مرة
+  function saveInitialName() {
+    const name = document.getElementById('input-initial-name').value.trim();
+    if (!name) return alert('لازم تختار اسم يا الغالي!');
+
+    currentUser.username = name;
+    currentUser.lastChange = Date.now();
+    localStorage.setItem('user_name', name);
+    localStorage.setItem('last_name_change', currentUser.lastChange);
+
+    updateUIHeader();
+    switchScreen('screen-lobby');
+  }
+
+  // 4. نظام الغرف واللعب أونلاين
+  function openDakeelLobby() { switchScreen('screen-dakeel'); }
+
+  function createRoom() {
+    socket.emit('create_room', currentUser);
+  }
+
+  function joinRoom() {
+    const code = document.getElementById('input-room-code').value.trim();
+    if (!code) return alert('اكتب كود الغرفة!');
+    socket.emit('join_room', { roomCode: code, ...currentUser });
+  }
+
+  function startGame() {
+    if (!currentRoom) return;
+    socket.emit('start_game', currentRoom.code);
+  }
+
+  function revealImposter() {
+    if (!currentRoom) return;
+    socket.emit('reveal_imposter', currentRoom.code);
+  }
+
+  // استقبال أحداث Socket.io
+  socket.on('room_created', ({ roomCode, room }) => {
+    currentRoom = room;
+    renderRoom(room);
+  });
+
+  socket.on('room_updated', (room) => {
+    currentRoom = room;
+    renderRoom(room);
+  });
+
+  socket.on('error_msg', (msg) => alert(msg));
+
+  function renderRoom(room) {
+    document.getElementById('room-details').style.display = 'block';
+    document.getElementById('current-room-code').innerText = room.code;
+
+    const list = document.getElementById('players-list');
+    list.innerHTML = '';
+    room.players.forEach(p => {
+      const li = document.createElement('li');
+      li.style.padding = '6px 0';
+      li.innerHTML = `👤 ${p.username} ${p.isOwner ? '<span class="badge-owner">الريس والعم 😎</span>' : ''}`;
+      list.appendChild(li);
+    });
+
+    // إخفاء زر البدء إلا لراعي الروم
+    const isHost = socket.id === room.hostId;
+    document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
+  }
+
+  socket.on('game_started', (data) => {
+    switchScreen('screen-gameplay');
+    const container = document.getElementById('role-container');
+    const hint = document.getElementById('hint-container');
+
+    if (data.isImposter) {
+      container.innerHTML = `<div class="role-box role-imposter">أنت الدخيل! 🕵️‍♂️🤫</div><p>ما تدري وش الكلمة، بس تصنّع واعرفها من كلامهم ولا تصيد نفسك!</p>`;
+      hint.innerText = `التلميح العام للكلمة: ${data.hint}`;
+    } else {
+      container.innerHTML = `<div class="role-box role-citizen">أنت مواطن صالح 👨‍🌾</div><h3>الكلمة السرية: [ ${data.secretWord} ]</h3>`;
+      hint.innerText = `التصنيف: ${data.hint}`;
+    }
+  });
+
+  socket.on('game_ended', ({ imposterName }) => {
+    alert(`انتهت الجولة! 🎉 الدخيل كان: [ ${imposterName} ]`);
+    switchScreen('screen-dakeel');
+  });
+
+  // 5. الإعدادات وتغيير الاسم كل ساعة
+  function openSettings() {
+    const last = parseInt(currentUser.lastChange) || 0;
+    const diff = Date.now() - last;
+    const cooldown = 60 * 60 * 1000; // ساعة كاملة بالمللي ثانية
+
+    if (diff < cooldown) {
+      const remainingMinutes = Math.ceil((cooldown - diff) / 60000);
+      document.getElementById('cooldown-timer').innerText = `⚠️ ما تقدر تغير اسمك إلا بعد ${remainingMinutes} دقيقة.`;
+    } else {
+      document.getElementById('cooldown-timer').innerText = `✅ يمديك تغير اسمك الحين.`;
+    }
+    switchScreen('screen-settings');
+  }
+
+  function closeSettings() {
+    switchScreen(currentUser.username ? 'screen-lobby' : 'screen-auth');
+  }
+
+  function changeName() {
+    const newName = document.getElementById('input-new-name').value.trim();
+    if (!newName) return alert('اكتب اسمك الجديد!');
+
+    const last = parseInt(currentUser.lastChange) || 0;
+    const diff = Date.now() - last;
+    const cooldown = 60 * 60 * 1000;
+
+    if (diff < cooldown) {
+      const remainingMinutes = Math.ceil((cooldown - diff) / 60000);
+      return alert(`اصبر يا غالي! النظام ما يسمح، باقيلك ${remainingMinutes} دقيقة وتغيره.`);
+    }
+
+    currentUser.username = newName;
+    currentUser.lastChange = Date.now();
+    localStorage.setItem('user_name', newName);
+    localStorage.setItem('last_name_change', currentUser.lastChange);
+
+    updateUIHeader();
+    alert('تم تعديل اسمك بنجاح يا الريس!');
+    closeSettings();
+  }
+
+  // 6. تغيير اللغة (سعودي / English)
+  function toggleLanguage() {
+    if (currentLang === 'ar') {
+      currentLang = 'en';
+      document.documentElement.dir = 'ltr';
+      document.getElementById('auth-title').innerText = 'Quick Login 🎮';
+      document.getElementById('auth-desc').innerText = 'Enter your email to receive your pass code:';
+      document.getElementById('soon-1').innerText = 'Under Development ⏳';
+      document.getElementById('soon-2').innerText = 'Under Development ⏳';
+      alert('Language switched to English!');
+    } else {
+      currentLang = 'ar';
+      document.documentElement.dir = 'rtl';
+      document.getElementById('auth-title').innerText = 'تسجيل الدخول السريع 🎮';
+      document.getElementById('auth-desc').innerText = 'حط إيميلك وبيرسلك رمز سري تكمل به اللعب:';
+      document.getElementById('soon-1').innerText = 'قيد التطوير ⏳';
+      document.getElementById('soon-2').innerText = 'قيد التطوير ⏳';
+      alert('تم الرجوع للهجة السعودية!');
+    }
+  }
+</script>
+</body>
+</html>
